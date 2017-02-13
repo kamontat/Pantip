@@ -129,10 +129,11 @@ public class MainActivity extends AppCompatActivity {
 			}
 			progress.dismiss();
 		}
-		
+
 		// if cancel
 		@Override
 		protected void onCancelled(ArrayList<Topic> topics) {
+			progress.setTitle("Cancel load");
 			progress.dismiss();
 		}
 	}
