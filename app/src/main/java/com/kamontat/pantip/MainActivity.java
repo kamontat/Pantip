@@ -1,9 +1,13 @@
 package com.kamontat.pantip;
 
+import android.app.ProgressDialog;
+import android.content.Context;
+import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import com.kamontat.model.Topic;
@@ -19,6 +23,10 @@ import java.net.URL;
 import java.util.*;
 
 public class MainActivity extends AppCompatActivity {
+	private static final String pantipAPI = "https://pantip.com/home/ajax_pantip_trend?p=1";
+	private static final String TAG = "Main";
+	ProgressDialog progress;
+
 	private ArrayList<Topic> topicList;
 	private ArrayAdapter<Topic> topicAdapter;
 
@@ -26,6 +34,7 @@ public class MainActivity extends AppCompatActivity {
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
+		progress = new ProgressDialog(this);
 
 		initListView();
 	}
@@ -37,7 +46,20 @@ public class MainActivity extends AppCompatActivity {
 		ListView listView = (ListView) findViewById(R.id.list);
 		listView.setAdapter(topicAdapter);
 
+		onClickInListView(listView);
+
 		new TrendTopicTask().execute();
+	}
+
+	public void onClickInListView(ListView listView) {
+		final Context self = this;
+		listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+			@Override
+			public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+				Topic topic = (Topic) parent.getItemAtPosition(position);
+				startActivity(new Intent(self, ShowActivity.class).putExtra("topic", topic));
+			}
+		});
 	}
 
 	public void refreshTopic(View view) {
@@ -54,8 +76,7 @@ public class MainActivity extends AppCompatActivity {
 		protected ArrayList<Topic> doInBackground(Void... params) {
 			ArrayList<Topic> result = new ArrayList<>();
 			try {
-				URL pantipAPI = new URL("https://pantip.com/home/ajax_pantip_trend?p=1");
-				HttpURLConnection urlConnection = (HttpURLConnection) pantipAPI.openConnection();
+				HttpURLConnection urlConnection = (HttpURLConnection) new URL(pantipAPI).openConnection();
 				BufferedReader buffered = new BufferedReader(new InputStreamReader(urlConnection.getInputStream()));
 				StringBuilder jsonResult = new StringBuilder();
 				String line;
@@ -69,10 +90,12 @@ public class MainActivity extends AppCompatActivity {
 
 				for (int i = 0; i < trends.length(); i++) {
 					JSONObject jsonObject = trends.getJSONObject(i);
-					int id = jsonObject.getInt("topic_id");
-					String title = jsonObject.getString("disp_topic");
-					result.add(new Topic(id, title));
+					int id = jsonObject.getInt(Topic.ID_JSON);
+					String title = jsonObject.getString(Topic.TITLE_JSON);
+					String body = jsonObject.getString(Topic.SHORT_BODY_JSON);
+					result.add(new Topic(id, title, body));
 				}
+
 				return result;
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -83,12 +106,34 @@ public class MainActivity extends AppCompatActivity {
 			}
 		}
 
+		// before start
+		@Override
+		protected void onPreExecute() {
+			progress.setTitle("Start loading..");
+			progress.show();
+		}
+
+		// while running
+		@Override
+		protected void onProgressUpdate(Void... values) {
+			progress.setTitle("Running...");
+		}
+
+		// after start
 		@Override
 		protected void onPostExecute(ArrayList<Topic> topics) {
 			if (topics != null) {
 				topicAdapter.clear();
 				topicAdapter.addAll(topics);
+				progress.setTitle("Complete loaded");
 			}
+			progress.dismiss();
+		}
+		
+		// if cancel
+		@Override
+		protected void onCancelled(ArrayList<Topic> topics) {
+			progress.dismiss();
 		}
 	}
 }
